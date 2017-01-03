@@ -1,19 +1,34 @@
-FROM ubuntu:latest
+FROM ubuntu:trusty
 MAINTAINER iiCore
-RUN apt-get update
-RUN apt-get install apache2 -y
-ENV APACHE_RUN_USER www-data
-ENV APACHE_RUN_GROUP www-data
-ENV APACHE_LOG_DIR /var/log/apache2
-ENV APACHE_PID_FILE /var/run/apache2.pid
-ENV APACHE_RUN_DIR /var/run/apache2
-ENV APACHE_LOCK_DIR /var/lock/apache2
-ENV APACHE_SERVERADMIN admin@localhost
-ENV APACHE_SERVERNAME localhost
-ENV APACHE_SERVERALIAS docker.localhost
-ENV APACHE_DOCUMENTROOT /var/www
-ADD ./conf/apache2.conf /etc/apache2/apache2.conf
 
-ADD ./conf/start.sh /start.sh
-RUN chmod 0755 /start.sh
-CMD ["bash", "start.sh"]
+# Install base packages
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get -yq install \
+        curl \
+        apache2 \
+        libapache2-mod-php5 \
+        php5-mysql \
+        php5-mcrypt \
+        php5-gd \
+        php5-curl \
+        php-pear \
+        php-apc && \
+    rm -rf /var/lib/apt/lists/* && \
+    curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+RUN /usr/sbin/php5enmod mcrypt
+RUN echo "ServerName localhost" >> /etc/apache2/apache2.conf && \
+    sed -i "s/variables_order.*/variables_order = \"EGPCS\"/g" /etc/php5/apache2/php.ini
+
+ENV ALLOW_OVERRIDE **False**
+
+# Add image configuration and scripts
+ADD start.sh /start.sh
+RUN chmod 755 /*.sh
+
+# Configure /app folder with sample app
+RUN mkdir -p /app && rm -fr /var/www/html && ln -s /app /var/www/html
+ADD sample/ /app
+
+EXPOSE 80
+WORKDIR /app
+CMD ["/start.sh"]
